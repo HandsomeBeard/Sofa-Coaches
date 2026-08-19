@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sofa Coaches</title>
+
+<style>
+body{
+    background:#121212;
+    color:#eee;
+    font-family:Arial,sans-serif;
+    padding:20px;
+}
+
+.section{
+    margin-bottom:30px;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th,td{
+    border:1px solid #444;
+    padding:8px;
+}
+
+th{
+    background:#222;
+}
+
+.error{
+    color:#ff7777;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Sofa Coaches</h1>
+
+<div class="section">
+    <h2>Standings</h2>
+    <div id="standings">Loading...</div>
+</div>
+
+<div class="section">
+    <h2>Teams</h2>
+    <ul id="teamList"></ul>
+</div>
+
+<div class="section">
+    <h2>Matchups</h2>
+    <div id="matchups">Loading...</div>
+</div>
+
+<div class="section">
+    <h2>Rosters</h2>
+    <div id="rosters">Loading...</div>
+</div>
+
+<script>
+
+const BASE_URL = "/espn";
+
+async function fetchLeague(view){
+    try{
+        const response = await fetch(
+            `${BASE_URL}?view=${view}`
+        );
+
+        if(!response.ok){
+            throw new Error(response.status);
+        }
+
+        return await response.json();
+    }
+    catch(err){
+        console.error(err);
+        return null;
+    }
+}
+
+function getTeamName(team){
+    return team.name || team.abbrev || `Team ${team.id}`;
+}
+
+async function loadStandings(){
+
+    const data = await fetchLeague("mTeam");
+
+    if(!data || !data.teams){
+        document.getElementById("standings").innerHTML =
+            "<div class='error'>Unable to load standings.</div>";
+        return;
+    }
+
+    let html = `
+        <table>
+            <tr>
+                <th>Team</th>
+                <th>Wins</th>
+                <th>Losses</th>
+            </tr>
+    `;
+
+    data.teams.forEach(team => {
+
+        const wins =
+            team.record?.overall?.wins ?? 0;
+
+        const losses =
+            team.record?.overall?.losses ?? 0;
+
+        html += `
+            <tr>
+                <td>${getTeamName(team)}</td>
+                <td>${wins}</td>
+                <td>${losses}</td>
+            </tr>
+        `;
+    });
+
+    html += "</table>";
+
+    document.getElementById("standings").innerHTML = html;
+}
+
+async function loadTeams(){
+
+    const data = await fetchLeague("mTeam");
+
+    if(!data || !data.teams){
+        return;
+    }
+
+    let html = "";
+
+    data.teams.forEach(team => {
+
+        html += `
+            <li>${getTeamName(team)}</li>
+        `;
+    });
+
+    document.getElementById("teamList").innerHTML = html;
+}
+
+async function loadMatchups() {
+
+    const matchupData = await fetchLeague("mMatchup");
+    const teamData = await fetchLeague("mTeam");
+
+    if (!matchupData || !teamData) {
+        document.getElementById("matchups").innerHTML =
+            "<div class='error'>Unable to load matchups.</div>";
+        return;
+    }
+
+    const teamMap = {};
+
+    teamData.teams.forEach(team => {
+        teamMap[team.id] = team.name;
+    });
+
+    const currentWeek = matchupData.status.currentMatchupPeriod;
+
+    const games = matchupData.schedule.filter(
+        game => game.matchupPeriodId === currentWeek
+    );
+
+    let html = `
+        <table>
+            <tr>
+                <th>Home Team</th>
+                <th>Away Team</th>
+                <th>Score</th>
+            </tr>
+    `;
+
+    games.forEach(game => {
+
+        const homeName =
+            teamMap[game.home.teamId] || "Unknown";
+
+        const awayName =
+            teamMap[game.away.teamId] || "Unknown";
+
+        html += `
+            <tr>
+                <td>${homeName}</td>
+                <td>${awayName}</td>
+                <td>
+                    ${(game.home.totalPoints || 0).toFixed(2)}
+                    -
+                    ${(game.away.totalPoints || 0).toFixed(2)}
+                </td>
+            </tr>
+        `;
+    });
+
+    html += "</table>";
+
+    document.getElementById("matchups").innerHTML = html;
+}
+  async function loadRosters(){
+
+    const rosterData = await fetchLeague("mRoster");
+const teamData = await fetchLeague("mTeam");
+
+const teamMap = {};
+
+teamData.teams.forEach(team => {
+    teamMap[team.id] = team.name;
+});
+
+
+    console.log("ROSTERS", rosterData);
+
+    if(!rosterData || !rosterData.teams){
+        document.getElementById("rosters").innerHTML =
+            "<div class='error'>Unable to load rosters.</div>";
+        return;
+    }
+
+    let html = "";
+
+    rosterData.teams.forEach(team => {
+
+        html += `<h3>${teamMap[team.id] || `Team ${team.id}`}</h3>`;
+
+        html += `
+            <table>
+                <tr>
+                    <th>Player ID</th>
+                    <th>Lineup Slot</th>
+                </tr>
+        `;
+
+        if(team.roster && team.roster.entries){
+
+            team.roster.entries.forEach(entry => {
+
+                html += `
+                    <tr>
+                        <td>
+${entry.playerPoolEntry?.player?.fullName || entry.playerId}
+</td>
+
+<td>
+${entry.lineupSlotId}
+</td>
+                    </tr>
+                `;
+            });
+        }
+
+        html += "</table><br>";
+    });
+
+    document.getElementById("rosters").innerHTML = html;
+}
+
+loadStandings();
+loadTeams();
+loadMatchups();
+loadRosters();
+
+</script>
+
+</body>
+</html>
